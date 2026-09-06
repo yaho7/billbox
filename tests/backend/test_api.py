@@ -110,3 +110,20 @@ def test_invalid_month_and_missing_transaction_return_client_errors(
 
     assert dashboard.status_code == 422
     assert update.status_code == 404
+
+
+def test_job_status_is_empty_before_first_run(authenticated_client):
+    response = authenticated_client.get("/api/jobs/latest")
+
+    assert response.status_code == 200
+    assert response.json() == {"state": "never", "job_name": "mail-ingestion"}
+
+
+def test_manual_ingestion_reports_missing_mail_configuration(authenticated_client):
+    response = authenticated_client.post(
+        "/api/jobs/ingest",
+        headers={"X-CSRF-Token": authenticated_client.csrf_token},
+    )
+
+    assert response.status_code == 503
+    assert "邮箱" in response.json()["detail"]

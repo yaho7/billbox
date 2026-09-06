@@ -392,3 +392,177 @@ class Ledger:
             }
             for row in rows
         ]
+
+    def claim_source_record(
+        self,
+        *,
+        provider: str,
+        mailbox: str,
+        uid_validity: int,
+        uid: int,
+        parser_name: str,
+        content_sha256: str,
+        subject: str,
+        received_at: str | None,
+        raw: Mapping[str, Any] | None = None,
+    ) -> str | None:
+        now = _now()
+        with self.database.transaction() as connection:
+            existing = connection.execute(
+                """
+                SELECT id, state
+                FROM source_records
+                WHERE provider = ? AND mailbox = ? AND uid_validity = ? AND uid = ?
+                """,
+                (provider, mailbox, uid_validity, uid),
+            ).fetchone()
+            if existing is not None and existing["state"] in {"processed", "ignored"}:
+                return None
+            if existing is not None:
+                record_id = str(existing["id"])
+                connection.execute(
+                    """
+                    UPDATE source_records
+                    SET parser_name = ?, content_sha256 = ?, subject = ?,
+                        received_at = ?, state = 'claimed', error = NULL,
+                        raw_json = ?, attempt_count = attempt_count + 1,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        parser_name,
+                        content_sha256,
+                        subject,
+                        received_at,
+                        _json(raw or {}) or "{}",
+                        now,
+                        record_id,
+                    ),
+                )
+                return record_id
+
+            record_id = str(uuid4())
+            connection.execute(
+                """
+                INSERT INTO source_records (
+                    id, provider, mailbox, uid_validity, uid, parser_name,
+                    content_sha256, subject, received_at, state, raw_json,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'claimed', ?, ?, ?)
+                """,
+                (
+                    record_id,
+                    provider,
+                    mailbox,
+                    uid_validity,
+                    uid,
+                    parser_name,
+                    content_sha256,
+                    subject,
+                    received_at,
+                    _json(raw or {}) or "{}",
+                    now,
+                    now,
+                ),
+            )
+        return record_id
+
+    def mark_source_record(
+        self, record_id: str, state: str, error: str | None = None
+    ) -> None:
+        if state not in {"processed", "ignored", "failed"}:
+            raise ValueError("unknown source record state")
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                UPDATE source_records
+                SET state = ?, error = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (state, error, _now(), record_id),
+            )
+
+    def failed_source_uids(self, mailbox: str, parser_name: str) -> list[int]:
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT uid
+                FROM source_records
+                WHERE provider = 'imap' AND mailbox = ?
+                  AND parser_name = ? AND state = 'failed'
+                ORDER BY updated_at
+                """,
+                (mailbox, parser_name),
+            ).fetchall()
+        return [int(row["uid"]) for row in rows]
+
+    def start_job(self, job_name: str) -> str:
+        job_id = str(uuid4())
+        now = _now()
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                UPDATE job_runs
+                SET state = 'failed', finished_at = ?,
+                    error = '服务重启，上一次运行未正常结束'
+                WHERE job_name = ? AND state = 'running'
+                """,
+                (now, job_name),
+            )
+            connection.execute(
+                """
+                INSERT INTO job_runs (id, job_name, state, started_at)
+                VALUES (?, ?, 'running', ?)
+                """,
+                (job_id, job_name, now),
+            )
+        return job_id
+
+    def append_job_log(self, job_id: str, message: str) -> None:
+        line = message.rstrip() + "\n"
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                UPDATE job_runs
+                SET log_text = substr(log_text || ?, -20000)
+                WHERE id = ?
+                """,
+                (line, job_id),
+            )
+
+    def finish_job(
+        self,
+        job_id: str,
+        *,
+        state: str,
+        summary: Mapping[str, Any],
+        error: str | None = None,
+    ) -> None:
+        if state not in {"succeeded", "failed"}:
+            raise ValueError("job state must be succeeded or failed")
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                UPDATE job_runs
+                SET state = ?, finished_at = ?, summary_json = ?, error = ?
+                WHERE id = ?
+                """,
+                (state, _now(), _json(summary) or "{}", error, job_id),
+            )
+
+    def latest_job(self, job_name: str) -> dict[str, Any] | None:
+        with self.database.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM job_runs
+                WHERE job_name = ?
+                ORDER BY started_at DESC
+                LIMIT 1
+                """,
+                (job_name,),
+            ).fetchone()
+        if row is None:
+            return None
+        result = _row(row)
+        result["summary"] = json.loads(result.pop("summary_json"))
+        return result

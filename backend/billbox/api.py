@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime
 from decimal import Decimal
 import secrets
@@ -42,7 +43,7 @@ class TransactionUpdateBody(BaseModel):
     review_state: Literal["pending", "confirmed"] | None = None
 
 
-def create_app(settings: Settings) -> FastAPI:
+def create_app(settings: Settings, *, enable_ingestion: bool = False) -> FastAPI:
     database = Database(settings.database_path, settings.migrations_dir)
     database.migrate()
     ledger = Ledger(database)
@@ -50,11 +51,30 @@ def create_app(settings: Settings) -> FastAPI:
         settings.session_secret, ttl_seconds=settings.session_ttl_seconds
     )
     limiter = LoginAttemptLimiter()
+    controller = None
+    scheduler = None
+    if enable_ingestion:
+        from .scheduler import create_runtime
 
-    app = FastAPI(title="Billbox", docs_url=None, redoc_url=None)
+        controller, scheduler = create_runtime(settings, ledger)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        if scheduler is not None:
+            scheduler.start()
+        try:
+            yield
+        finally:
+            if scheduler is not None and scheduler.running:
+                scheduler.shutdown(wait=False)
+
+    app = FastAPI(
+        title="Billbox", docs_url=None, redoc_url=None, lifespan=lifespan
+    )
     app.state.database = database
     app.state.ledger = ledger
     app.state.settings = settings
+    app.state.ingestion_controller = controller
 
     def require_session(request: Request) -> Session:
         session = sessions.verify(request.cookies.get(sessions.cookie_name))
@@ -194,6 +214,25 @@ def create_app(settings: Settings) -> FastAPI:
     ) -> dict:
         del session
         return ledger.list_options()
+
+    @app.get("/api/jobs/latest")
+    def latest_job(
+        session: Session = Depends(require_session),
+    ) -> dict:
+        del session
+        latest = ledger.latest_job("mail-ingestion")
+        return latest or {"state": "never", "job_name": "mail-ingestion"}
+
+    @app.post("/api/jobs/ingest", status_code=202)
+    def start_ingestion(
+        session: Session = Depends(require_csrf),
+    ) -> dict[str, bool]:
+        del session
+        if controller is None:
+            raise HTTPException(status_code=503, detail="请先配置邮箱连接信息")
+        if not controller.trigger():
+            raise HTTPException(status_code=409, detail="邮件抓取正在运行")
+        return {"started": True}
 
     @app.get("/{path:path}", include_in_schema=False)
     def frontend(path: str):

@@ -5,4 +5,4 @@ from .config import Settings
 
 
 def create_application():
-    return create_app(Settings.from_env())
+    return create_app(Settings.from_env(), enable_ingestion=True)

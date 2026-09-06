@@ -63,4 +63,4 @@ def test_migrations_are_safe_to_apply_twice(database):
             "SELECT version FROM schema_migrations ORDER BY version"
         ).fetchall()
 
-    assert [row[0] for row in versions] == [1]
+    assert [row[0] for row in versions] == [1, 2]
