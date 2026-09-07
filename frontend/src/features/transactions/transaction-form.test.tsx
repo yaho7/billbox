@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
+import type { LedgerOptions } from "@/api/types"
 import { TransactionForm } from "@/features/transactions/transaction-form"
 
 const options = {
@@ -13,7 +14,7 @@ const options = {
     { id: "dining", name: "餐饮", scope: "expense" },
     { id: "salary", name: "工资", scope: "income" },
   ],
-}
+} satisfies LedgerOptions
 
 describe("TransactionForm", () => {
   it("uses explicit labels and submits a normalized manual entry", async () => {
