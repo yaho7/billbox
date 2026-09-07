@@ -26,9 +26,10 @@ def test_compose_uses_published_image_and_persistent_sqlite_volume():
     service = compose["services"]["billbox"]
 
     assert set(service) == {"image", "env_file", "ports", "volumes", "restart"}
-    assert service["image"] == "${BILLBOX_IMAGE:-ghcr.io/yaho7/billbox:main}"
-    assert service["env_file"] == ["${BILLBOX_ENV_FILE:-.env}"]
-    assert "/data" in service["volumes"][0]
+    assert service["image"] == "ghcr.io/yaho7/billbox:latest"
+    assert service["env_file"] == ".env"
+    assert service["ports"] == ["2005:8000"]
+    assert service["volumes"] == ["./data:/data"]
     assert service["restart"] == "unless-stopped"
 
 
@@ -45,6 +46,11 @@ def test_action_only_builds_image_for_main_push_without_git_tag_trigger():
     assert "docker/build-push-action@v7" in uses
     assert not any("deploy" in step.get("name", "").lower() for step in steps)
     assert not any("git tag" in step.get("run", "") for step in steps)
+
+    metadata_step = next(
+        step for step in steps if step.get("uses") == "docker/metadata-action@v6"
+    )
+    assert "type=raw,value=latest" in metadata_step["with"]["tags"]
 
     build_step = next(
         step for step in steps if step.get("uses") == "docker/build-push-action@v7"

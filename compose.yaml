@@ -2,14 +2,10 @@ name: billbox
 
 services:
   billbox:
-    image: ${BILLBOX_IMAGE:-ghcr.io/yaho7/billbox:main}
+    image: ghcr.io/yaho7/billbox:latest
     restart: unless-stopped
-    env_file:
-      - ${BILLBOX_ENV_FILE:-.env}
+    env_file: .env
     ports:
-      - "127.0.0.1:${BILLBOX_PORT:-8000}:8000"
+      - "2005:8000"
     volumes:
-      - billbox-data:/data
-
-volumes:
-  billbox-data:
+      - ./data:/data
