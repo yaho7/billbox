@@ -2,7 +2,7 @@ name: billbox
 
 services:
   billbox:
-    image: ${BILLBOX_IMAGE:-ghcr.io/your-user/billbox:main}
+    image: ${BILLBOX_IMAGE:-ghcr.io/yaho7/billbox:main}
     init: true
     restart: unless-stopped
     read_only: true

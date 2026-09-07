@@ -7,7 +7,7 @@ Billbox 是一个完全运行在自己机器上的私人账本：FastAPI 提供�
 仓库不在本机构建生产包。每次 push 到 `main` 后，GitHub Actions 只构建并推送多架构 Docker 镜像到 GHCR，不部署服务，也不创建 Git tag。镜像会提供两个容器标签：持续更新的 `main` 和对应提交的 `sha-xxxxxxx`。
 
 1. 把仓库中的 `.env.example` 复制为 `.env`。
-2. 将 `BILLBOX_IMAGE` 改成 Actions 生成的 `ghcr.io/<owner>/<repository>:main`。
+2. 确认 `BILLBOX_IMAGE` 为 Actions 生成的 `ghcr.io/yaho7/billbox:main`。
 3. 设置强密码，并用 `openssl rand -hex 32` 生成 `SESSION_SECRET`。
 4. 如需邮件自动归集，填写 IMAP 配置。
 5. 拉取并启动：

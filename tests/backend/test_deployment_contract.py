@@ -26,7 +26,7 @@ def test_compose_uses_published_image_and_persistent_sqlite_volume():
     service = compose["services"]["billbox"]
 
     assert "build" not in service
-    assert service["image"].endswith(":main}")
+    assert service["image"] == "${BILLBOX_IMAGE:-ghcr.io/yaho7/billbox:main}"
     assert "/data" in service["volumes"][0]
     assert service["environment"]["DATABASE_PATH"] == "/data/billbox.db"
     assert service["restart"] == "unless-stopped"
