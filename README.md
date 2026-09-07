@@ -82,7 +82,7 @@ Vite 开发服务器会把 `/api` 和 `/healthz` 代理到 `127.0.0.1:8000`。�
 
 ## 安全边界
 
-- 容器以非 root 用户运行、根文件系统只读，并移除 Linux capabilities。
+- 镜像固定以非 root 用户运行。
 - 登录 Cookie 为 HttpOnly、SameSite=Strict；写操作还要求会话内 CSRF token。
 - 登录失败在进程内限流。服务重启会清空限流状态，因此仍应只在本机或可信反向代理后暴露。
 - IMAP 仅使用系统信任链验证的 TLS，不跳过证书校验。

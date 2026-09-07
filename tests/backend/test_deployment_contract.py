@@ -25,12 +25,11 @@ def test_compose_uses_published_image_and_persistent_sqlite_volume():
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     service = compose["services"]["billbox"]
 
-    assert "build" not in service
+    assert set(service) == {"image", "env_file", "ports", "volumes", "restart"}
     assert service["image"] == "${BILLBOX_IMAGE:-ghcr.io/yaho7/billbox:main}"
+    assert service["env_file"] == ["${BILLBOX_ENV_FILE:-.env}"]
     assert "/data" in service["volumes"][0]
-    assert service["environment"]["DATABASE_PATH"] == "/data/billbox.db"
     assert service["restart"] == "unless-stopped"
-    assert service["read_only"] is True
 
 
 def test_action_only_builds_image_for_main_push_without_git_tag_trigger():
