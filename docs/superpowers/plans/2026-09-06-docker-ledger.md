@@ -4,7 +4,7 @@
 
 **Goal:** Build a self-hosted personal bookkeeping application that runs the existing China Merchants Bank email automation, a normalized SQLite ledger, a protected FastAPI API, and a shadcn React interface in one Docker image.
 
-**Architecture:** A single container serves the compiled Vite application through FastAPI and runs a guarded in-process scheduler for IMAP ingestion. SQLite under `/data` is the only source of truth; accounts, categories, transactions, source receipts, audit entries, and job runs are separate tables. GitHub Actions reacts to every push to `main`, verifies and builds the image in GitHub, and publishes `main` plus immutable commit-SHA image tags to GHCR without creating Git tags or deploying the container.
+**Architecture:** A single container serves the compiled Vite application through FastAPI and runs a guarded in-process scheduler for IMAP ingestion. SQLite under `/data` is the only source of truth; accounts, categories, transactions, source receipts, audit entries, and job runs are separate tables. GitHub Actions reacts to every push to `main`, builds the image in GitHub, and publishes `main` plus immutable commit-SHA image tags to GHCR without creating Git tags or deploying the container.
 
 **Tech Stack:** Python 3.13, FastAPI, standard-library SQLite, APScheduler, IMAP, React, TypeScript, Vite, Tailwind CSS, shadcn/ui, Vitest, pytest, Docker, GitHub Actions, GHCR.
 

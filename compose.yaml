@@ -1,0 +1,40 @@
+name: billbox
+
+services:
+  billbox:
+    image: ${BILLBOX_IMAGE:-ghcr.io/your-user/billbox:main}
+    init: true
+    restart: unless-stopped
+    read_only: true
+    ports:
+      - "127.0.0.1:${BILLBOX_PORT:-8000}:8000"
+    environment:
+      DATABASE_PATH: /data/billbox.db
+      MIGRATIONS_DIR: /app/migrations
+      FRONTEND_DIST: /app/frontend/dist
+      APP_PASSWORD: ${APP_PASSWORD:?set APP_PASSWORD in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-43200}
+      MAIL_USER: ${MAIL_USER:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      IMAP_SERVER: ${IMAP_SERVER:-}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      MAX_EMAILS: ${MAX_EMAILS:-50}
+      SCHEDULE_ENABLED: ${SCHEDULE_ENABLED:-true}
+      SCHEDULE_HOUR: ${SCHEDULE_HOUR:-3}
+      SCHEDULE_MINUTE: ${SCHEDULE_MINUTE:-30}
+      SCHEDULE_TIMEZONE: ${SCHEDULE_TIMEZONE:-Asia/Shanghai}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
+    volumes:
+      - billbox-data:/data
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 30s
+
+volumes:
+  billbox-data:
